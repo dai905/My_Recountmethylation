@@ -9,7 +9,7 @@
 # 
 # Due to the varying availability of the Python package depedencies across 
 # operating systems, to ensure package build success these functions aren't 
-# exported and must be called with "recountmethylation:::". For background and 
+# exported. For background and 
 # instructions about workign with search indices for DNAm arrays, see the package 
 # vignette "Nearest neighbors analysis for DNAm arrays."
 #
@@ -60,9 +60,10 @@ setup_sienv <- function(env.name = "dnam_si_hnswlib",
 #' # get_fh(csv_savepath = "bval_fn.csv", csv_openpath = of_fpath, ndim = 100)
 get_fh <- function(csv_savepath, csv_openpath, ndim = 1000, lstart = 1){
   message("Starting basilisk process...")
-  proc <- recountmethylation:::setup_sienv()
+  proc <- setup_sienv()
   pyscript.path <- system.file("python", package = "recountmethylation")
   pyscript.path <- file.path(pyscript.path, "dnam_search_index.py")
+  if(!file.exists(pyscript.path)){stop("Error, couldn't find python script source.")}
   message("Doing feature hashing...")
   ncol <- length(unlist(strsplit(readLines(csv_openpath, 1), ",")))
   message("Target features will reduce dimensions from ", ncol, 
@@ -109,9 +110,10 @@ make_si <- function(fh_csv_fpath, si_fname = "new_search_index.pickle",
                     si_dict_fname = "new_index_dict.pickle", threads = 4, 
                     space_val = 'l2', efc_val = 2000, m_val = 1000, ef_val = 2000){
   message("Starting basilisk process...")
-  proc <- recountmethylation:::setup_sienv()
+  proc <- setup_sienv()
   pyscript.path <- system.file("python", package = "recountmethylation")
   pyscript.path <- file.path(pyscript.path, "dnam_search_index.py")
+  if(!file.exists(pyscript.path)){stop("Error, couldn't find python script to source.")}
   basilisk::basiliskRun(proc, function(pyscript.path, fh_csv_fpath, si_fname, 
                                        si_dict_fname, threads, space_val, 
                                        efc_val, m_val, ef_val){
@@ -156,7 +158,7 @@ make_si <- function(fh_csv_fpath, si_fname = "new_search_index.pickle",
 #' dict files (required, char).
 #' @param lkval Vector of K nearest neighbors to return per query (optional, 
 #' int, c(1,2)).
-#' @returns
+#' @returns Nearest neighbors results of search index query.
 #' @examples
 #' # file paths
 #' # fh table
@@ -218,10 +220,11 @@ query_si <- function(sample_idv, fh_csv_fpath,
   if(!file.exists(si_dict_fpath)){
     stop("Error: didn't find index dict at location:\n'",si_dict_fpath,"'")}
   message("Starting basilisk process...")
-  proc <- recountmethylation:::setup_sienv()
+  proc <- setup_sienv()
   lkval <- lapply(lkval, as.integer) # format query k values list
   pyscript.path <- system.file("python", package = "recountmethylation")
   pyscript.path <- file.path(pyscript.path, "dnam_search_index.py")
+  if(!file.exists(pyscript.path)){stop("Error, couldn't find python script to source.")}
   query_result <- basilisk::basiliskRun(proc, function(pyscript.path, 
     sample_idv, lkval, si_dict_fpath, fh_csv_fpath){
     message("Sourcing Python functions...")

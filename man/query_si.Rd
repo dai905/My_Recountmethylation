@@ -31,7 +31,7 @@ dict files (required, char).}
 int, c(1,2)).}
 }
 \value{
-
+Nearest neighbors results of search index query.
 }
 \description{
 Query an HNSW search index. Does K Nearest Neighbors lookup on a previously 

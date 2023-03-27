@@ -1,5 +1,5 @@
 Package: recountmethylation
-Version: 1.9.0
+Version: 1.9.1
 Title: Access and analyze public DNA methylation array data compilations
 Authors@R: c(person(c("Sean", "K"), "Maden", role = c("cre", "aut"),
         email = "maden@ohsu.edu", comment = c(ORCID = "0000-0002-2212-4894")),
@@ -29,8 +29,11 @@ Imports:
     RCurl,
     R.utils,
     BiocFileCache,
-    IlluminaHumanMethylation450kmanifest
+    basilisk,
+    reticulate,
+    DelayedMatrixStats
 Suggests:
+    minfiData,
     knitr,
     testthat,
     ggplot2,
@@ -44,4 +47,4 @@ Suggests:
 VignetteBuilder:
     knitr
 biocViews: DNAMethylation, Epigenetics, Microarray, MethylationArray, ExperimentHub
-RoxygenNote: 7.1.2
+RoxygenNote: 7.2.0

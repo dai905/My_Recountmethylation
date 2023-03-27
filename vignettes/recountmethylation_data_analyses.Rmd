@@ -34,13 +34,12 @@ suppressMessages(library(gridExtra))
 suppressMessages(library(GenomicRanges))
 suppressMessages(library(limma))
 suppressMessages(library(HDF5Array))
-opts_chunk$set(eval = FALSE, echo = TRUE, 
-               warning = FALSE, message = FALSE)
+opts_chunk$set(eval = FALSE, echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
 # Overview
 
-This vignette walks through 3 analysis examples using data accessed with the 
+This vignette walks through 3 analysis examples featured in the paper @maden_human_2021. These analyses use data accessed with the 
 `recountmethylation` package. First, predicted and chronological ages are 
 compared from the sample metadata. Then quality signals  (methylated and 
 unmethylated, log2 median scale) are compared between samples stored using 
@@ -64,7 +63,7 @@ Load the file "data_analyses.RData" from the `recountmethylation` package files.
 This contains the resultant/final data objects produced by the script, which will 
 be used in evaluated code chunks below.
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 sf <- system.file(file.path("extdata", "data_analyses"), 
                   package = "recountmethylation")
 load(file.path(sf, "data_analyses.RData"))
@@ -75,7 +74,7 @@ load(file.path(sf, "data_analyses.RData"))
 The analysis script uses sample metadata and 2 database files. Retrieve the 
 provided sample metadata from the `recountmethylation` package files.
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 # get local metadata
 mdpath <- system.file("extdata", "gsm_metadata", "md_final_hm450k_0-0-1.rda", 
                     package = "recountmethylation")
@@ -110,7 +109,7 @@ implements the Horvath biological age clock (@horvath_dna_2013).
 Get samples for which both `age` and `predage` age are available. From `age`, 
 make a new numeric variable `chron.age`.
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 mdf <- md[!md$age == "valm:NA",]
 mdf$chron.age <- as.numeric(gsub(";.*", "", gsub("^valm:", "", mdf$age)))
 mdf$predage <- as.numeric(mdf$predage)
@@ -121,7 +120,7 @@ mdf <- mdf[!is.na(mdf$predage),]
 Next, make a new variable `stype` from `sampletype` and remove samples with 
 missing values.
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 mdf$stype <- as.character(gsub(";.*", "", 
   gsub("^msraptype:", "", mdf$sampletype)))
 mdf <- mdf[!is.na(mdf$stype),]
@@ -130,7 +129,7 @@ mdf <- mdf[!is.na(mdf$stype),]
 Now make a new variable `is.cx` from querying `cancer` in the `disease` term. 
 This reflects whether a sample was likely from a cancer or a cancer patient.
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 mdf$is.cx <- ifelse(grepl(".*cancer.*", mdf$disease), TRUE, FALSE)
 ```
 
@@ -139,7 +138,7 @@ mean absolute difference (a.k.a. "MAD") between `chron.age` and `predage`
 across samples from the same study. Also store study sizes in the `ngsm` term 
 for plotting. 
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 xdif <- ngsm <- c()
 for(g in unique(mdf$gseid)){
     mdff <- mdf[mdf$gseid==g, ]
@@ -153,7 +152,7 @@ Make a new filtered `mdff` data frame using the new variables. Retain likely
 non-cancer samples from studies with MAD <= 10 years. Pre- and post-filter 
 datasets (groups 1 and 2, respectively) are summarized below.
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 filt <- mdf$stype == "tissue" & !mdf$is.cx
 filt <- filt & !mdf$gseid %in% names(xdif[xdif > 10])
 mdff <- mdf[filt, ]
@@ -164,7 +163,7 @@ mdff <- mdf[filt, ]
 Perform statistical analyses of `mdf` (group 1) and `mdff` (group 2). First, 
 generate multiple regressions for each. 
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 lm1 <- lm(mdf$predage ~ mdf$chron.age + mdf$gseid + mdf$stype + mdf$is.cx)
 lm2 <- lm(mdff$predage ~ mdff$chron.age + mdff$gseid)
 ```
@@ -174,7 +173,7 @@ variance percentages and p-values for covariates in each model. Columns
 "Vperc" and "Pval" are the percent variance and unadjusted p-value for 
 covariates in each model.
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 # anovas
 av1 <- anova(lm1)
 av2 <- anova(lm2)
@@ -196,7 +195,7 @@ knitr::kable(dan, align = "c")
 Now calcualte the R-squared, Spearman correlation coefficient (Rho), and MAD 
 for each model.
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 # rsquared
 rsq1 <- round(summary(lm1)$r.squared, 2)
 rsq2 <- round(summary(lm2)$r.squared, 2)
@@ -212,7 +211,7 @@ mad2 <- round(mean(abs(mdff$chron.age - mdff$predage)), 2)
 
 Finally, organize and display the results
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 dss <- data.frame(group = c("1", "2"),
                   ngsm = c(nrow(mdf), nrow(mdff)),
                   ngse = c(length(unique(mdf$gseid)), 
@@ -227,7 +226,7 @@ knitr::kable(dss, align = "c")
 Plot sample counts and MAD for each GSE record, with a vertical line at the 
 10-years MAD cutoff used for the group 2 filter.
 
-```{r, dpi = 65, eval = TRUE, fig.width = 3.8, fig.height = 3.4}
+```{r, dpi = 65, eval = FALSE, fig.width = 3.8, fig.height = 3.4}
 plot(xdif, ngsm, ylab = "Study Size (Num. GSM)", 
      xlab = "Age Difference, MAD[Chron, Pred]")
 abline(v = 10, col = "red")
@@ -235,7 +234,7 @@ abline(v = 10, col = "red")
 
 Finally, plot the chronological and predicted ages for group 2 samples.
 
-```{r, dpi = 65, eval = TRUE, fig.width = 3.4, fig.height = 3.1}
+```{r, dpi = 65, eval = FALSE, fig.width = 3.4, fig.height = 3.1}
 ggplot(mdff, aes(x = chron.age, y = predage)) +
   geom_point(size = 1.2, alpha = 0.2) + geom_smooth(method = "lm", size = 1.2) +
   theme_bw() + xlab("Chronological Age") + ylab("Epigenetic (DNAm) Age")
@@ -251,7 +250,7 @@ scale) between samples stored with either FFPE or fresh freezing (FF).
 Identify and summarize samples with the `storage` variable available. Use 
 values in `storage` to inform a new `sgroup` variable.
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 mdf <- md[!md$storage == "NA",]
 mdf$sgroup <- ifelse(grepl("FFPE", mdf$storage), "ffpe", "frozen")
 ```
@@ -320,7 +319,7 @@ using the `geom_point` function. Color by storage type with the
 `scale_color_manual` function (FFPE samples are orange, frozen samples are 
 purple).
 
-```{r, dpi = 65, eval = TRUE, fig.width = 4.3, fig.height = 3.1}
+```{r, dpi = 65, eval = FALSE, fig.width = 4.3, fig.height = 3.1}
 ggplot(ds, aes(x = meth.l2med, y = unmeth.l2med, color = storage)) + 
   geom_point(alpha = 0.35, cex = 3) + theme_bw() +
   scale_color_manual(values = c("ffpe" = "orange", "frozen" = "purple"))
@@ -330,7 +329,7 @@ Next, make separate violin plots for signals and groups using the `geom_violin`
 function with the same colors for each storage type. Draw horizontal median 
 lines by setting the `draw_quantiles` argument to 0.5.
 
-```{r, dpi = 65, eval = TRUE, fig.width = 4.5, fig.height = 2.5}
+```{r, dpi = 65, eval = FALSE, fig.width = 4.5, fig.height = 2.5}
 vp <- matrix(nrow = 0, ncol = 2)
 vp <- rbind(vp, matrix(c(ds$meth.l2med, paste0("meth.", ds$storage)), 
   ncol = 2))
@@ -364,7 +363,7 @@ and `liver.gsmv` to filter the metadata (see vectors in the data_analyses.R
 script). Also define tissues in the new group variable `sgroup`. Summarize the 
 sample groups in a table
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 gsmv <- c(adipose.gsmv, liver.gsmv)
 mdf <- md[md$gsm %in% gsmv,]
 mdf$sgroup <- ifelse(mdf$gsm %in% adipose.gsmv, "adipose", "liver")
@@ -423,7 +422,7 @@ ds2$tissue <- as.factor(ms$sgroup)
 Make a scatter plot of log2 median signals by tissue type with the `geom_point` 
 function.
 
-```{r, dpi = 65, eval = TRUE, fig.width = 3.2, fig.height = 2}
+```{r, dpi = 65, eval = FALSE, fig.width = 3.2, fig.height = 2}
 ggplot(ds2, aes(x = l2med.meth, y = l2med.unmeth, color = tissue)) + 
   geom_point(alpha = 0.3, cex = 3) + theme_bw()
 ```
@@ -646,7 +645,7 @@ high variance probes for a single tissue. Categorize probes as
 "tissue-specific" or "non-specific" using the `table` function to determine 
 their frequency of occurrence across tissues.
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 cgav <- c()
 for(t in tv){
   txcg <- unique(c(lmvp.abs[[t]], lmvp.bin[[t]]))
@@ -717,14 +716,14 @@ to make violin plots for DNAm fraction means and variances. Store plots in
 the `lvp` list, then display them vertically using the `grid.arrange` function 
 from the gridExtra package.
 
-```{r, dpi = 65, eval = TRUE, fig.width = 3.8, fig.height = 4.5}
+```{r, dpi = 65, eval = FALSE, fig.width = 3.8, fig.height = 4.5}
 lvp <- makevp(lfcg, ltxcg)
 grid.arrange(lvp[[1]], lvp[[2]], ncol = 1, bottom = "Tissue")
 ```
 
 Tabulate the means of probe set statistics by tissue.
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 tcgss <- matrix(nrow = 0, ncol = 6)
 for(t in tv){
   datt <- apply(lcgssf[[t]], 2, function(x){
@@ -751,7 +750,7 @@ Make the 2 plots objects for means and variances with `hmplots()`, which wraps
 the `geom_tile` ggplot2 function. Finally, display plots horizontally with 
 `grid.arrange`.
 
-```{r, dpi = 65, eval = TRUE, fig.width = 8.2, fig.height = 4.7}
+```{r, dpi = 65, eval = FALSE, fig.width = 8.2, fig.height = 4.7}
 cga <- get_cga(anno)
 lhmset <- hmsets(ltxcg, lfcg, cga)
 lhmplots <- hmplots(lhmset$hm.mean, lhmset$hm.var, lhmset$hm.size)
@@ -777,7 +776,7 @@ additional utilities to analyze DNAm data, consult the `minfi` and
 
 # Session info
 
-```{r get_sessioninfo, eval = TRUE}
+```{r get_sessioninfo, eval = FALSE}
 sessionInfo()
 ```
 

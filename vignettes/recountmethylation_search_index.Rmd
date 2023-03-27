@@ -24,12 +24,9 @@ vignette: >
   %\VignetteEngine{knitr::rmarkdown}
 ---
 
-```{r chunk_settings, eval = T, echo = F, warning = F, message = F}
-library(recountmethylation)
-library(basilisk)
-library(reticulate)
-library(HDF5Array)
-library(ggplot2)
+```{r chunk_settings, eval = TRUE, echo = FALSE, warning = FALSE, message = FALSE}
+libv <- c("recountmethylation", "basilisk", "reticulate", "HDF5Array", "ggplot2")
+sapply(libv, library, character.only = TRUE)
 knitr::opts_chunk$set(eval = FALSE, echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
@@ -63,7 +60,7 @@ First, use the `setup_sienv()` function to set up a Python virtual environment n
 
 For greater reproducibility, specify exact dependency versions e.g. like "numpy==1.20.1". Install the `hnswlib` (v0.5.1) library to manage search index construction and access. install `pandas` (v1.2.2) and `numpy` (v1.20.1) for data manipulations, and `mmh3` (v3.0.0) for feature hashing. Note certain packages, including `hnswlib`, may only be available in conda repositories for certain operating systems.
 
-```{r}
+```{r, eval = FALSE}
 recountmethylation:::setup_sienv(env.name = "dnam_si_vignette")
 ```
 
@@ -75,7 +72,7 @@ First, save the DNAm fractions (Beta-values) from a `SummarizedExperiment` objec
 
 First, load the `h5se` object.
 
-```{r}
+```{r, eval = FALSE}
 gr.fname <- "gr-noob_h5se_hm450k-epic-merge_0-0-3"
 gr <- HDF5Array::loadHDF5SummarizedExperiment(gr.fname)
 md <- as.data.frame(colData(gr)) # get sample metadata
@@ -103,7 +100,7 @@ gsmv <- c(gsmv, mdf[sample(nrow(mdf), 20),]$gsm)
 
 For the specified samples of interest, extract DNAm Beta-value fractions for a subset of 100 probes.
 
-```{r}
+```{r, eval = FALSE}
 # norm bvals for probe subset
 num.cg <- 100
 grf <- gr[,gr$gsm %in% gsmv]; dim(grf)
@@ -124,7 +121,7 @@ Call `get_fh()` to perform feature hashing on the DNAm data. Feature hashing is 
 
 Specify the target dimensions for this step using the `ndim` argument. For this small example, reduce the DNAm matrix to about 10% of its original size by setting the target dimensions to 10 (e.g. use `ndim = 10`).
 
-```{r}
+```{r, eval = FALSE}
 # get example table and labels
 num.dim <- 10 # target reduced dimensions
 fhtable.fpath <- "bval_100_fh10.csv"
@@ -309,7 +306,7 @@ ggplot(dfp, aes(x = `Sample\ntype`, y = perc.samples, fill = `Sample\ntype`)) +
 
 # Session Info
 
-```{r, eval = T}
+```{r, eval = TRUE}
 utils::sessionInfo()
 ```
 

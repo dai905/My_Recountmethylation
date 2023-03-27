@@ -63,7 +63,7 @@ bactrl <- function(cdf = NULL, baset = "reduced",
                 "any control probe addresses. Are the rows labeled",
                 " with valid probe addresses?"))}
   rm <- data.frame(sample_id = colnames(rs)) # return matrix
-  addr.bkg <- recountmethylation:::ba.background(cdf)
+  addr.bkg <- ba.background(cdf)
   if(length(addr.bkg) == 1 & is.na(addr.bkg[1])){
     stop("Error: couldn't get addresses for background signal probes.")}
   message("Calculating BeadArray metrics...")
@@ -72,38 +72,38 @@ bactrl <- function(cdf = NULL, baset = "reduced",
     message("Calculating reduced metric set...")} else{
     message("Calculating the full BeadArray metric set...")
   }
-  rm <- recountmethylation:::ba.biotinstaining.red(rs = rs, 
+  rm <- ba.biotinstaining.red(rs = rs, 
     biotin.baseline = biotin.baseline, rm = rm, cdf = cdf, mtot = batot) 
-  rm <- recountmethylation:::ba.biotinstaining.grn(gs = gs, rm = rm, cdf = cdf, 
+  rm <- ba.biotinstaining.grn(gs = gs, rm = rm, cdf = cdf, 
     biotin.baseline = biotin.baseline, mtot = batot) 
-  rm <- recountmethylation:::ba.nonpolymorphic.red(rs = rs, rm = rm, cdf = cdf, 
+  rm <- ba.nonpolymorphic.red(rs = rs, rm = rm, cdf = cdf, 
     mtot = batot) 
-  rm <- recountmethylation:::ba.nonpolymorphic.grn(gs = gs, rm = rm, cdf = cdf, 
+  rm <- ba.nonpolymorphic.grn(gs = gs, rm = rm, cdf = cdf, 
     mtot = batot) 
-  rm <- recountmethylation:::ba.bisulfiteconv1.red(rs = rs, rm = rm, cdf = cdf, 
+  rm <- ba.bisulfiteconv1.red(rs = rs, rm = rm, cdf = cdf, 
     mtot = batot) 
   if(baset == "reduced"){
     message("Returning reduced metric set...")
     return(rm)
   }
-  rm <- recountmethylation:::ba.restoration(gs = gs, rm = rm, cdf = cdf, 
+  rm <- ba.restoration(gs = gs, rm = rm, cdf = cdf, 
     addr.bkg = addr.bkg) 
-  rm <- recountmethylation:::ba.specificity1.red(rs = rs, rm = rm, cdf = cdf)
-  rm <- recountmethylation:::ba.specificity1.grn(gs = gs, rm = rm, cdf = cdf)
-  rm <- recountmethylation:::ba.specificity2(rs = rs, gs = gs, rm = rm, 
+  rm <- ba.specificity1.red(rs = rs, rm = rm, cdf = cdf)
+  rm <- ba.specificity1.grn(gs = gs, rm = rm, cdf = cdf)
+  rm <- ba.specificity2(rs = rs, gs = gs, rm = rm, 
     cdf = cdf)
-  rm <- recountmethylation:::ba.extension.red(rs = rs, rm = rm, cdf = cdf)
-  rm <- recountmethylation:::ba.extension.grn(gs = gs, rm = rm, cdf = cdf)
-  rm <- recountmethylation:::ba.hybridization.hi.vs.med(gs = gs, rm = rm, 
+  rm <- ba.extension.red(rs = rs, rm = rm, cdf = cdf)
+  rm <- ba.extension.grn(gs = gs, rm = rm, cdf = cdf)
+  rm <- ba.hybridization.hi.vs.med(gs = gs, rm = rm, 
     cdf = cdf)
-  rm <- recountmethylation:::ba.hybridization.med.vs.low(gs = gs, rm = rm, 
+  rm <- ba.hybridization.med.vs.low(gs = gs, rm = rm, 
     cdf = cdf)
-  rm <- recountmethylation:::ba.targetremoval1(gs = gs, rm = rm, cdf = cdf, 
+  rm <- ba.targetremoval1(gs = gs, rm = rm, cdf = cdf, 
     baseline = baseline)
-  rm <- recountmethylation:::ba.targetremoval2(gs = gs, rm = rm, cdf = cdf,
+  rm <- ba.targetremoval2(gs = gs, rm = rm, cdf = cdf,
     baseline = baseline)
-  rm <- recountmethylation:::ba.bisulfiteconv1.grn(gs = gs, rm = rm, cdf = cdf)
-  rm <- recountmethylation:::ba.bisulfiteconv2(rs = rs, gs = gs, rm = rm, 
+  rm <- ba.bisulfiteconv1.grn(gs = gs, rm = rm, cdf = cdf)
+  rm <- ba.bisulfiteconv2(rs = rs, gs = gs, rm = rm, 
     cdf = cdf)
   message("Returning the full BeadArray metric set...")
   return(rm)
@@ -151,7 +151,7 @@ bathresh <- function(){
 #' library(minfiData)
 #' data(MsetEx)
 #' se <- MsetEx
-#' class(se)
+#' # class(se)
 #' # [1] "MethylSet"
 #' # attr(,"package")
 #' # [1] "minfi"
