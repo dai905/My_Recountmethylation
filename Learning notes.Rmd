@@ -1,0 +1,112 @@
+---
+title: "recountmethylation User's Guide"
+author:
+- Liuhan
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+bibliography: bibliography.bib
+csl: cell-numeric.csl
+package: recountmethylation
+output:
+  BiocStyle::html_document:
+    code_folding: show
+    toc: yes
+    tocfloat: yes
+  BiocStyle::pdf_document: 
+    toc: yes
+    toc_depth: 2
+vignette:  
+  %%\VignetteIndexEntry{recountmethylation User's Guide}
+  %\VignetteDepends{RCurl}
+  %\usepackage[UTF-8]{inputenc} 
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+---
+```{r setup, echo = FALSE, warning = FALSE}
+suppressMessages(library(knitr))
+suppressMessages(library(GenomicRanges))
+suppressMessages(library(limma))
+suppressMessages(library(minfi))
+suppressMessages(library(ExperimentHub))
+suppressMessages(library(recountmethylation))
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = FALSE, 
+  message = FALSE)
+```
+
+# There are three ways of loading data
+# 1. load .h5 file from ExperimentHub - caching database
+# Method 1 is not very useful since we have to deal with .h5 file directly instead of SummarizedExperiment object
+# 2. load from recountmethylation dataserver - full list ( seems to be more complete) get_servermatrix() , getdb
+# Method 2 is caching 
+# 3. load from local directory - not using cache (I am not so sure whether it is inferior to the first two methods.)
+#HDF5Array::load....
+geo.red <- geo.red[order(match(rownames(geo.red), rownames(h5.red))),]
+# here is a explanation of what this command is doing.
+# We start from geo.red[1], find which h5.red[j] (starting from j = 1) matches geo.red[1], return h5.red[j] as the 1st element in output
+# In the end, we 
+
+# In the validation step, they first check whether probe ID matches and then they check whether signal matrix matches or not.
+# A summary of data processing from geo is as below:
+# 1) load by get_IDAT2gr - recountmethylation - RGChannel type
+# 2) normalization by minfi::preprocessnoob - Methyltype
+# 3) calculate Beta value using getBeta - matrix type
+# 4) 
+
+# The code that load anything from recountmethylation data server is as follows:
+```{r, eval = FALSE}
+# sm <- as.data.frame(smfilt(get_servermatrix())) # This smfilt() will lose some .h5 dataset which is essential for data processing change it to the next line:
+
+sm <- as.data.frame(get_servermatrix())
+if(is(sm, "data.frame")){knitr::kable(sm, align = "c")} # display available database on the server
+
+## load methylset - MethylSet files
+gmdn <- "remethdb-h5se_gm_0-0-1_1590090412"
+
+# for methylset in data anlaysies vignette, use getdb_h5se type
+gm <- getdb_h5se_gm(
+  platform = c("hm450k", "epic"),
+  dfp = NULL,
+  namematch = gmdn,
+  verbose = FALSE
+)
+
+## load grset - GenomicRanges files
+grdn <- "remethdb-h5se_gr_0-0-1_1590090412"
+gr <- getdb_h5se_gr(
+  platform = c("hm450k", "epic"),
+  dfp = NULL,
+  namematch = grdn,
+  verbose = FALSE
+)
+
+```
+
+If you can not find from recountmethylation data server,
+The code that load anything from ExperimentHub data server on Bioconductor is as follows:
+```{r, eval = FALSE}
+cache.path <- tools::R_user_dir("recountmethylation")
+setExperimentHubOption("CACHE", cache.path)
+hub <- ExperimentHub::ExperimentHub()                    # connect to the hubs
+rmdat <- AnnotationHub::query(hub, "recountmethylation") # query the hubs
+
+# for data anlaysies vignette, search ExperimentHub unique identifier for gmdn and grdn
+title <- mcols(rmdat)$title
+
+## load methylset
+gmdn_UID <- names(rmdat)[grepl("remethdb-h5se_gm_0-0-1_1590090412",title)]
+
+gmdn_fpath <- rmdat[[gmdn_UID]] # download with default caching
+gmdn <- rhdf5::h5ls(gmdn_fpath)         # load the h5 file
+gm <- loadHDF5SummarizedExperiment(gmdn)
+
+## load grset
+grdn_UID <- names(rmdat)[grepl("remethdb-h5se_gm_0-0-1_1590090412",title)]
+grdn_fpath <- rmdat[[grdn_UID]] # download with default caching
+grdn <- rhdf5::h5ls(grdn_fpath)         # load the h5 file
+gr <- loadHDF5SummarizedExperiment(grdn)
+```
+
+
+Several tips as follows:
+1. In principl, it might be a good idea to look at metadata from HDF5-SummarizedExperiment type dataset to separate cancer from normal tissues or pick up a specific tissue like whole blood for analysis. Please refere to data_analyses.Rmd
+  a. There are some filters before begining data processing.
+  b. We can use the disease column in the metadata for whole blood analysis!!!
