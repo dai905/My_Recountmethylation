@@ -32,8 +32,8 @@ suppressMessages(library(limma))
 suppressMessages(library(minfi))
 suppressMessages(library(ExperimentHub))
 suppressMessages(library(recountmethylation))
-knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = FALSE, 
-  message = FALSE)
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = TRUE, 
+  message = TRUE)
 ```
 
 # Introduction and overview
@@ -92,7 +92,7 @@ if(is(sm, "data.frame")){knitr::kable(sm, align = "c")}
 The DNAm array database files are indexed on `ExperimentHub`, and are 
 viewable as follows. Note, the cache needs to be set with `R_user_dir()` per instructions [here](https://bioconductor.org/packages/devel/bioc/vignettes/ExperimentHub/inst/doc/ExperimentHub.html#default-caching-location-update).
 
-```{r, eval = F}
+```{r, eval = FALSE}
 cache.path <- tools::R_user_dir("recountmethylation")
 setExperimentHubOption("CACHE", cache.path)
 hub <- ExperimentHub::ExperimentHub()                    # connect to the hubs

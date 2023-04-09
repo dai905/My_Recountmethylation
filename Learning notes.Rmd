@@ -62,6 +62,8 @@ if(is(sm, "data.frame")){knitr::kable(sm, align = "c")} # display available data
 gmdn <- "remethdb-h5se_gm_0-0-1_1590090412"
 
 # for methylset in data anlaysies vignette, use getdb_h5se type
+# We might want to specify and keep track of file path by using 
+# dfp = BiocFileCache(, ask = FALSE)
 gm <- getdb_h5se_gm(
   platform = c("hm450k", "epic"),
   dfp = NULL,
@@ -110,3 +112,4 @@ Several tips as follows:
 1. In principl, it might be a good idea to look at metadata from HDF5-SummarizedExperiment type dataset to separate cancer from normal tissues or pick up a specific tissue like whole blood for analysis. Please refere to data_analyses.Rmd
   a. There are some filters before begining data processing.
   b. We can use the disease column in the metadata for whole blood analysis!!!
+2. For blood sample dataset, use sample [index]("https://recount.bio/data/sidict-hnsw__bval-gseadj-fh10k__all-blood-2-platforms.pickle") of pre-compiled DNAm array data from blood samples on the [`recountmethylation` server](https://recount.bio/data/). These data were available in the Gene Expression Omnibus (GEO) by March 31, 2021, and they include 13,835 samples run on either the HM450K or EPIC platform.

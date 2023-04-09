@@ -1,0 +1,72 @@
+---
+title: "Analyze blood Methylation with recountmethylation"
+author:
+- Liuhan
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+bibliography: bibliography.bib
+csl: cell-numeric.csl
+package: recountmethylation
+output:
+  BiocStyle::html_document:
+    code_folding: show
+    toc: yes
+    tocfloat: yes
+  BiocStyle::pdf_document: 
+    toc: yes
+    toc_depth: 2
+vignette:  
+  %%\VignetteIndexEntry{recountmethylation User's Guide}
+  %\VignetteDepends{RCurl}
+  %\usepackage[UTF-8]{inputenc} 
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+---
+```{r setup, echo = FALSE, warning = FALSE}
+suppressMessages(library(knitr))
+suppressMessages(library(GenomicRanges))
+suppressMessages(library(limma))
+suppressMessages(library(minfi))
+suppressMessages(library(ExperimentHub))
+suppressMessages(library(recountmethylation))
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = TRUE, 
+                      message = TRUE)
+```
+
+This script is used for generating figures for figure 6d in my Methylation-SiMREPS paper draft. In panel 6d, our purpose is to generate DNA methylation level at BCAT1 promoter produced on either platform of Illumina Epic Array and Human Methylation 450. Our sample type will be whole blood from male healthy people with or without cancer.
+
+One of Vigenettes in recountmethylation R package is `recount_methylation_search_index.Rmd` that talks about search index construction from pre-compiled DNAm array data from blood samples on the [`recountmethylation` server](https://recount.bio/data/). The pre-compiled DNAm array data from blood is `gr-noob_h5se_hm450k-epic-merge_0-0-3` which is available for download from `recount.bio/data`. This dataset includes 13,835 samples run on either the HM450K or EPIC platform available in the Gene Expression Omnibus (GEO) by March 31, 2021, recent enough for publication.
+
+What we are going to do is as follows:
+1. Download `gr-noob_h5se_hm450k-epic-merge_0-0-3` under server dir (`Z:\Liuhan Dai\DNA Methylation Detection\20230408 figure 6d`) defined by BiocFileCache. Create a BiocFileCache and store this dataset in cache dir using getdb_* method. (This will take several hours.)
+2. Load from cache and check its content
+3. Then do analysis
+
+# Download `gr-noob_h5se_hm450k-epic-merge_0-0-3` under server dir
+```{r, eval = FALSE}
+bfc <-BiocFileCache(cache = "Z:/Liuhan Dai/DNA Methylation Detection/20230408 figure 6d",ask = interactive())
+if (grepl('C:',bfccache(bfc))) q()
+url <- "https://recount.bio/data/gr-noob_h5se_hm450k-epic-merge_0-0-3"
+fname <- 'gr-noob_h5se_hm450k-epic-merge_0-0-3'
+gr <- getdb_h5se_gr(
+  platform = c("hm450k", "epic"),
+  dfp = bfccache(bfc),
+  namematch = fname,
+  verbose = FALSE
+)
+bfcadd(bfc,fname,fpath = gr, action="asis")
+```
+
+# Download `remethdb-h5_rg-test_0-0-1_1590090412.h5` under server dir
+```{r, eval = FALSE}
+bfc <-BiocFileCache(cache = 'Z:/Liuhan Dai/DNA Methylation Detection/20230408 figure 6d', ask = interactive())
+if (grepl('C:',bfccache(bfc))) q()
+url <- "https://recount.bio/data/remethdb-h5_rg-test_0-0-1_1590090412.h5"
+fname <- 'remethdb-h5_rg-test_0-0-1_1590090412.h5'
+rgtest <- getdb_h5_test(
+  platform = c("hm450k", "epic"),
+  dfp = bfccache(bfc),
+  namematch = fname,
+  verbose = FALSE
+)
+bfcadd(bfc,fname,fpath = rgtest, action="asis")
+```
