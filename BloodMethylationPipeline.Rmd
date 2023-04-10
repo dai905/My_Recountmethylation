@@ -53,7 +53,7 @@ gr <- getdb_h5se_gr(
   namematch = fname,
   verbose = FALSE
 )
-bfcadd(bfc,fname,fpath = gr, action="asis")
+bfcadd(bfc,fname,fpath =  paste(bfccache(bfc), fname, sep = '/'), action="asis")
 ```
 
 # Download `remethdb-h5_rg-test_0-0-1_1590090412.h5` under server dir
@@ -68,5 +68,29 @@ rgtest <- getdb_h5_test(
   namematch = fname,
   verbose = FALSE
 )
-bfcadd(bfc,fname,fpath = rgtest, action="asis")
+bfcadd(bfc,fname,fpath =  paste(bfccache(bfc), fname, sep = '/'), action="asis")
+```
+# Download `remethdb-h5se_gr-test_0-0-1_1590090412` under server dir
+## This file is used for testing my own pipeline
+```{r, eval = FALSE}
+bfc <-BiocFileCache(cache = 'Z:/Liuhan Dai/DNA Methylation Detection/20230408 figure 6d', ask = interactive())
+if (grepl('C:',bfccache(bfc))) q()
+url <- "https://recount.bio/data/remethdb-h5se_gr-test_0-0-1_1590090412"
+fname <- 'remethdb-h5se_gr-test_0-0-1_1590090412'
+grtest <- getdb_h5se_test(
+  platform = c("hm450k", "epic"),
+  dfp = bfccache(bfc),
+  namematch = fname,
+  verbose = FALSE
+)
+bfcadd(bfc,fname,fpath =  paste(bfccache(bfc), fname, sep = '/'), action="asis")
+```
+# Start data analysis: 1) get metadata from colDaat
+```{r, eval = FALSE}
+md <- as.data.frame(colData(grtest)) # get sample metadata
+
+# 1) identify GSM from whole blood and remove NA under sample type [['sampletype']]
+# 2) Classify them based on some phenotypes, e.g. 1) sex ([['sex']] 2) cancer or non-cancer ([['disease]])
+# 3) choose gene of interest in other words - probes of interest, specifically there are three probes in BCAT1 promoter region:
+# cg02765913 cg23036244 cg10764357
 ```
