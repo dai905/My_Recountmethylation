@@ -1,38 +1,33 @@
 ---
-title: "Analyze blood Methylation with recountmethylation -v1"
-author:
-- Liuhan
-date: "`r format(Sys.time(), '%d %B, %Y')`"
-bibliography: bibliography.bib
-csl: cell-numeric.csl
-package: recountmethylation
-output:
-  BiocStyle::html_document:
-    code_folding: show
-    toc: yes
-    tocfloat: yes
-  BiocStyle::pdf_document: 
-    toc: yes
-    toc_depth: 2
-vignette:  
-  %%\VignetteIndexEntry{recountmethylation User's Guide}
-  %\VignetteDepends{RCurl}
-  %\usepackage[UTF-8]{inputenc} 
-  %\VignetteEncoding{UTF-8}
-  %\VignetteEngine{knitr::rmarkdown}
+title: "Analyze blood Methylation with recountmethylation - v1" 
+  author:- Liuhan
+date: "`r format(Sys.time(), '%d %B, %Y')`" bibliography: bibliography.bib csl:
+cell-numeric.csl package: recountmethylation output: BiocStyle::html_document:
+code_folding: show toc: yes tocfloat: yes BiocStyle::pdf_document: toc: yes
+toc_depth: 2 vignette: %%\VignetteIndexEntry{recountmethylation User's Guide}
+%\VignetteDepends{RCurl} %\usepackage[UTF-8]{inputenc} %\VignetteEncoding{UTF-8}
+%\VignetteEngine{knitr::rmarkdown}
 ---
 ```{r setup, echo = FALSE, warning = FALSE}
 suppressMessages(library(knitr))
+suppressMessages(library(tidyverse))
 suppressMessages(library(GenomicRanges))
 suppressMessages(library(limma))
 suppressMessages(library(minfi))
 suppressMessages(library(ExperimentHub))
 suppressMessages(library(recountmethylation))
-knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = TRUE, 
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = TRUE,
                       message = TRUE)
 ```
-
-This script is used for generating figures for figure 6d in my Methylation-SiMREPS paper draft. In panel 6d, our purpose is to generate DNA methylation level at BCAT1 promoter produced on either platform of Illumina Epic Array and Human Methylation 450. Our sample type will be whole blood from male healthy people with or without cancer.
+This script is used for generating figures for figure 6d in my
+Methylation-SiMREPS paper draft. In panel 6d, our purpose is to generate DNA
+methylation level at BCAT1 promoter produced on either platform of Illumina Epic
+Array and Human Methylation 450. Our sample type will be whole blood from male
+healthy people with or without cancer.
+One of Vigenettes in recountmethylation R package is
+`recount_methylation_search_index.Rmd` that talks about search index
+construction from pre-compiled DNAm array data from blood samples on the
+[`recountmethylation` server](https://recount.bio/data/).
 
 The pre-compiled DNAm array data from blood is `gr-noob_h5se_hm450k-epic-merge_0-0-3` which is available for download from `recount.bio/data`. This dataset includes 13,835 samples run on either the HM450K or EPIC platform available in the Gene Expression Omnibus (GEO) by March 31, 2021, recent enough for publication. 
 
@@ -40,26 +35,133 @@ However, in `BloodMethylationPipeline.Rmd`, we realized that `gr-noob_h5se_hm450
 
 This dataset is said to include 38,122 EPIC samples with IDATs available on GEO before October 16, 2022.
 
-What we are going to do is as follows:
-1. Download `gr-noob_h5se_hm450k-epic-merge_0-0-3` under server dir (`Z:\Liuhan Dai\DNA Methylation Detection\20230408 figure 6d`) defined by BiocFileCache. Create a BiocFileCache and store this dataset in cache dir using getdb_* method. (This will take several hours.)
-2. Load from cache and check its content
-3. Then do analysis
+What we are going to do is as follows: 
+1. Download `remethdb_h5se-gm_epic_0-0-2_1589820348` under server dir (`Z:\Liuhan Dai\DNA
+Methylation Detection\20230408 figure 6d`) defined by BiocFileCache. Create a
+BiocFileCache and store this dataset in cache dir using getdb_* method. (This
+will take several hours.) 
 
+2. Load from cache and check its content 
+
+3. Then do analysis
 # Download `remethdb_h5se-gm_epic_0-0-2_1589820348` under server dir
-```{r, eval = FALSE}
+```{r}
 bfc <-BiocFileCache(cache = "Z:/Liuhan Dai/DNA Methylation Detection/20230408 figure 6d",ask = interactive())
 if (grepl('C:',bfccache(bfc))) q()
-url <- "https://recount.bio/data/remethdb_h5se-gm_epic_0-0-2_1589820348"
 fname <- 'remethdb_h5se-gm_epic_0-0-2_1589820348'
-gr <- getdb_h5se_gm(
-  platform = c("hm450k", "epic"),
-  dfp = bfccache(bfc),
-  namematch = fname,
-  verbose = FALSE
-)
-bfcadd(bfc,fname,fpath =  paste(bfccache(bfc), fname, sep = '/'), action="asis")
+filepath <- paste(bfccache(bfc), fname, sep = '/')
+# For this file, getdb() and get_rmdl() neither recoginize its file name.
+# Therefore, decide to download and cache it manually
+if (!file.exists(filepath)) {
+  bfcadd(bfc,fname,fpath =  filepath, action="asis")
+}
+# Load data by H5SE method
+gm <- HDF5Array::loadHDF5SummarizedExperiment(paste(bfccache(bfc), fname, sep = '/'))
+md <-  colData(gm) # get sample metadata (DO NOT CONVERT TO DATA FRAME!!!!! using as.data.frame)
 ```
 
+
+```{r}
+# First of all, there are several labels of interest: gse, sex, disease, tissue, sampletype
+# Let us visualize them one by one to understand the constitutions of our dataset
+f <- function(x,y) nrow(md[y == x,])
+unique(md$gse)
+unique(md$sex); sapply(unique(md$sex), f, y =  md$sex)
+unique(md$disease); sapply(unique(md$disease), f, y =  md$disease)
+unique(md$tissue); sapply(unique(md$tissue), f, y =  md$tissue)
+# unique(md$sampletype); sapply(unique(md$sampletype), f, y =  md$sampletype) # Sample type label is not too useful.
+```
+Now the question is which subset is of our interest. First of all, let us subset
+samples from whole_blood.
+
+```{r}
+# extract whold_blood subset
+#md_whole_blood1 <- md[md$tissue == 'blood;whole_blood;whole' | md$tissue == 'blood;whole_blood',]
+# Alternatively, we can sues blood.subgroup component to subset whole blood samples. Decide to use blood.subgroup for subsetting
+md_whole_blood <- md[md$blood.subgroup == 'whole_blood',]
+f <- function(x,y) nrow(md_whole_blood[y == x,])
+sapply(unique(md_whole_blood$sex), f, y =  md_whole_blood$sex); sapply(unique(md_whole_blood$disease), f, y =  md_whole_blood$disease)
+```
+Then, let us subset GenomicRatioset object for whold_blood subgroup using gsm
+IDs we have in metadata.
+```{r}
+gr_whold_blood <- gr_noob[, gr_noob$gsm %in% md_whole_blood$gsm] # filt h5se object. Here gsm and other meta data is in "column" of gr_noob. # However, once you extract metadata by colData() -> md or md_whole_blood where its metadata now is stored in row
+md_whole_blood <- md_whole_blood[order(match(md_whole_blood$gsm, gr_whold_blood$gsm)),] # Synchronize order of md_whole_blood and gr_whold_blood by gsm sequence
+identical(gr_whold_blood$gsm, md_whole_blood$gsm)
+```
+Secondly, let us extract DNAm Beta-value fractions for a subset of 3 probes that
+are within BCAT1 promoter region.
+
+```{r}
+# save bval table
+bval <- getBeta(gr_whold_blood)
+bval <- t(bval) # get transpose
+cg_BCAT1 <- c('cg02765913', 'cg23036244', 'cg10764357')
+f <- function (x,y)  y[grepl(x,y)]
+cgf_BCAT1 <- sapply(cg_BCAT1, f, y = colnames(bval)) # search for which probe for BCAT1 promoter exists in this dataset
+cgf_BCAT1 <- as.character(cgf_BCAT1) ; cgf_BCAT1 <- cgf_BCAT1[nchar(cgf_BCAT1) == 10]
+bval_BCAT1 <- bval[,colnames(bval) %in% cgf_BCAT1]  # extract a subset of 3 cg probes that are within BCAT1 promoter region
+names(bval_BCAT1) <- gsub("\\..*", "", rownames(bval)) # format rownames
+BCAT1 <- tibble( bval_BCAT1); colnames(BCAT1) <- cgf_BCAT1; row.names(BCAT1) <- names(bval_BCAT1)
+if (identical(gr_whold_blood$gsm, rownames(BCAT1))) {
+  BCAT1 <- bind_cols(BCAT1,as_tibble(colData(gr_whold_blood)))
+  }
+```
+
+BCAT1 is a tibble object where each row is a GSM study and its column represent different phenotypes.Now, we are interested to see whether there is any difference in methylation beta values btw sexes, tissues and disease types. We do this by extract gsm for corresponding subsets.
+
+# Visualize methylation beta value distribution by sex, tissue or disease
+``` {r}
+BP <- ggplot(data = BCAT1)
+BP + geom_histogram(mapping = aes(x = cg10764357, y = after_stat(width) * after_stat(density), fill = tissue), position = 'identity', alpha = 0.5)
+BP + geom_histogram(mapping = aes(x = cg10764357, y = after_stat(width) * after_stat(density), fill = sex), position = 'identity', alpha = 0.5)
+
+BP + geom_freqpoly(mapping = aes(x = cg10764357, y = after_stat(width) * after_stat(density), color = tissue), position = 'identity')
+BP + geom_freqpoly(mapping = aes(x = cg10764357, y = after_stat(width) * after_stat(density), color = sex), position = 'identity')
+
+BP + geom_histogram(mapping = aes(x = cg10764357, after_stat(density), fill = sex)) + facet_grid(sex~.)
+BP + geom_histogram(mapping = aes(x = cg10764357, after_stat(density), fill = disease)) + facet_grid(disease~.)
+BP + stat_boxplot(mapping = aes(x = sex, y = cg10764357))
+BP + stat_boxplot(mapping = aes(x = disease, y = cg10764357)) + facet_wrap(~sex)
+BP + stat_boxplot(mapping = aes(x = tissue, y = cg10764357))
+```
+
+To get a quantitative assessment, we can also create a summar table for BCAT1
+
+```{r}
+sex_summary <- BCAT1 %>%
+  group_by(sex) %>%
+  summarize(mean_value = mean(cg10764357),
+            median_value = median(cg10764357),
+            min = min(cg10764357),
+            max = max(cg10764357)
+            )
+
+disease_summary <-
+  BCAT1 %>%
+  group_by(disease) %>%
+  summarize(mean_value = mean(cg10764357),
+            median_value = median(cg10764357),
+            min = min(cg10764357),
+            max = max(cg10764357)
+  )
+sex_summary
+disease_summary
+
+diseaseSex_summary <-
+  BCAT1 %>%
+  group_by(disease, sex) %>%
+  summarize(mean_value = mean(cg10764357),
+            median_value = median(cg10764357),
+            min = min(cg10764357),
+            max = max(cg10764357)
+  )
+```
+# Results and discussion
+
+Based on figure 6's calibration curve, we are able to calculate the conc. of methylated BCAT1 promoter in whole blood of male in healthy patient, which is (10.2-0.3)/1.61 = 6.149 fM, in other words, 30.7%, a number that never occurs in our whole blood sample measured on platform illumina human methylation 450k. The average level in male is 4.24% measured by microarray. However, there is only one probe covering this region of interest. What would happen if we include all three probes? For example, if we include probes from other platforms like EPIC/Human850K or EPIC V2
+
+## Sections below are for testing purposes only.
 # Download `remethdb-h5_rg-test_0-0-1_1590090412.h5` under server dir
 ```{r, eval = FALSE}
 bfc <-BiocFileCache(cache = 'Z:/Liuhan Dai/DNA Methylation Detection/20230408 figure 6d', ask = interactive())
@@ -67,34 +169,35 @@ if (grepl('C:',bfccache(bfc))) q()
 url <- "https://recount.bio/data/remethdb-h5_rg-test_0-0-1_1590090412.h5"
 fname <- 'remethdb-h5_rg-test_0-0-1_1590090412.h5'
 rgtest <- getdb_h5_test(
-  platform = c("hm450k", "epic"),
-  dfp = bfccache(bfc),
-  namematch = fname,
-  verbose = FALSE
+platform = c("hm450k", "epic"),
+dfp = bfccache(bfc),
+namematch = fname,
+verbose = FALSE
 )
-bfcadd(bfc,fname,fpath =  paste(bfccache(bfc), fname, sep = '/'), action="asis")
+filepath <- paste(bfccache(bfc), fname, sep = '/')
+# For this file, getdb() and get_rmdl() neither recoginize its file name.
+# Therefore, decide to download and cache it manually
+if (!file.exists(filepath)) {
+bfcadd(bfc,fname,fpath =  filepath, action="asis")
+}
 ```
-# Download `remethdb-h5se_gr-test_0-0-1_1590090412` under server dir
-## This file is used for testing my own pipeline
+# Download `remethdb-h5se_gr-test_0-0-1_1590090412` under server dir ## This
+file is used for testing my own pipeline
 ```{r, eval = FALSE}
 bfc <-BiocFileCache(cache = 'Z:/Liuhan Dai/DNA Methylation Detection/20230408 figure 6d', ask = interactive())
 if (grepl('C:',bfccache(bfc))) q()
 url <- "https://recount.bio/data/remethdb-h5se_gr-test_0-0-1_1590090412"
 fname <- 'remethdb-h5se_gr-test_0-0-1_1590090412'
 grtest <- getdb_h5se_test(
-  platform = c("hm450k", "epic"),
-  dfp = bfccache(bfc),
-  namematch = fname,
-  verbose = FALSE
+platform = c("hm450k", "epic"),
+dfp = bfccache(bfc),
+namematch = fname,
+verbose = FALSE
 )
-bfcadd(bfc,fname,fpath =  paste(bfccache(bfc), fname, sep = '/'), action="asis")
-```
-# Start data analysis: 1) get metadata from colDaat
-```{r, eval = FALSE}
-md <- as.data.frame(colData(grtest)) # get sample metadata
-
-# 1) identify GSM from whole blood and remove NA under sample type [['sampletype']]
-# 2) Classify them based on some phenotypes, e.g. 1) sex ([['sex']] 2) cancer or non-cancer ([['disease]])
-# 3) choose gene of interest in other words - probes of interest, specifically there are three probes in BCAT1 promoter region:
-# cg02765913 cg23036244 cg10764357
+filepath <- paste(bfccache(bfc), fname, sep = '/')
+# For this file, getdb() and get_rmdl() neither recoginize its file name.
+# Therefore, decide to download and cache it manually
+if (!file.exists(filepath)) {
+bfcadd(bfc,fname,fpath =  filepath, action="asis")
+}
 ```
