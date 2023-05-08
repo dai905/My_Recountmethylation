@@ -49,15 +49,16 @@ will take several hours.)
 bfc <-BiocFileCache(cache = "Z:/Liuhan Dai/DNA Methylation Detection/20230408 figure 6d",ask = interactive())
 if (grepl('C:',bfccache(bfc))) q()
 fname <- 'remethdb_h5se-gm_epic_0-0-2_1589820348'
-filepath <- paste(bfccache(bfc), fname, sep = '/')
+filepath <- file.path(bfccache(bfc), fname)
 # For this file, getdb() and get_rmdl() neither recoginize its file name.
 # Therefore, decide to download and cache it manually
 if (!file.exists(filepath)) {
+  # Load data by H5SE method
+  gm <- HDF5Array::loadHDF5SummarizedExperiment(file.path(bfccache(bfc), fname))
+  md <-  colData(gm) # get sample metadata (DO NOT CONVERT TO DATA FRAME!!!!! using as.data.frame)
   bfcadd(bfc,fname,fpath =  filepath, action="asis")
 }
-# Load data by H5SE method
-gm <- HDF5Array::loadHDF5SummarizedExperiment(paste(bfccache(bfc), fname, sep = '/'))
-md <-  colData(gm) # get sample metadata (DO NOT CONVERT TO DATA FRAME!!!!! using as.data.frame)
+
 ```
 
 
