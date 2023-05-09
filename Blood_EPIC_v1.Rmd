@@ -1,0 +1,221 @@
+---
+title: "Blood methylation pipeline using recountmethylation on EPIC array - V1"
+author:
+-  Liuhan Dai
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+bibliography: bibliography.bib
+csl: cell-numeric.csl
+package: recountmethylation
+output:
+  BiocStyle::html_document:
+    code_folding: show
+    toc: yes
+    tocfloat: yes
+  BiocStyle::pdf_document: 
+    toc: yes
+    toc_depth: 2
+vignette: > 
+  %\VignetteIndexEntry{Blood_EPIC_v1}
+  %\VignetteDepends{RCurl}
+  %\usepackage[UTF-8]{inputenc} 
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+---
+
+# Introdcution and overview: 
+
+This script is to combine functionalities of `BloodMethylationPipeline_EPIC_v0_a` and `v0_b`. What it does is as follows:
+
+1. load two compiled datasets stored on lab server.
+  a. Both datasets are measured on illumina infinium methylation EPIC array
+  b. Their url on online server is 
+  1) https://recount.bio/data/remethdb_h5se-gm_epic_0-0-2_1589820348/
+  2) https://recount.bio/data/remethdb_epic-hm850k_h5se_gm_1669220613_0-0-3/
+
+2. Subset blood and whole blood samples for each of them
+
+3. Subset BCAT1 promoter cg probes for blood and whole blood subgroup
+
+4. Visualization and statistical summary
+
+# Environment setup
+```{r setup, echo = FALSE, warning = FALSE}
+suppressMessages(library(knitr))
+suppressMessages(library(GenomicRanges))
+suppressMessages(library(limma))
+suppressMessages(library(minfi))
+suppressMessages(library(ExperimentHub))
+suppressMessages(library(recountmethylation))
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = TRUE, 
+  message = TRUE)
+```
+
+# Load cached datasets on lab server
+
+```{r}
+BE.load <- function(fname,cachepath = "Z:/Liuhan Dai/DNA Methylation Detection/20230408 figure 6d") {
+bfc <-BiocFileCache(cache = cachepath,ask = interactive())
+if (grepl('C:',bfccache(bfc))) q()
+
+filepath <- file.path(bfccache(bfc), fname)
+# For this file, getdb() and get_rmdl() neither recoginize its file name.
+# Therefore, decide to cache it manually
+if (file.exists(filepath) & !fname %in% bfcinfo(bfc)$rname) {
+      bfcadd(bfc,fname,fpath =  filepath, action="asis")
+} else {
+  print(paste(fname,'doesn\'t exist or is already cached'))
+}
+# Load data by H5SE method
+gm <- HDF5Array::loadHDF5SummarizedExperiment(file.path(bfccache(bfc), fname))
+return(gm)
+}
+
+# load `remethdb_h5se-gm_epic_0-0-2_1589820348` as gm1 and `remethdb_epic-hm850k_h5se_gm_1669220613_0-0-3` as gm2
+gm1 <- BE.load('remethdb_h5se-gm_epic_0-0-2_1589820348')
+gm2 <- BE.load('remethdb_epic-hm850k_h5se_gm_1669220613_0-0-3')
+
+md1 <-  colData(gm1) # get sample metadata (DO NOT CONVERT TO DATA FRAME!!!!! using as.data.frame)
+md2 <-  colData(gm2) # get sample metadata (DO NOT CONVERT TO DATA FRAME!!!!! using as.data.frame)
+```
+
+# Subset blood and whole blood samples for `gm1` and `gm2`
+
+```{r}
+# extract GSM ID subset for blood and whole blood in `gm1`
+
+md1_blood <- md1[grepl('blood',md1$tissue),]
+unique(md1_blood$tissue)
+md1_whole_blood <- md1[grepl('whole_blood',md1$tissue),]
+unique(md1_whole_blood$tissue)
+f <- function(x,y) nrow(md1_whole_blood[y == x,])
+sapply(unique(md1_whole_blood$sex), f, y =  md1_whole_blood$sex); sapply(unique(md1_whole_blood$disease), f, y =  md1_whole_blood$disease)
+```
+
+```{r}
+# extract GSM ID subset for blood and whole blood in `gm2`
+
+md2_blood <- md2[grepl('blood',md2$tissue),]
+unique(md2_blood$tissue)
+md2_whole_blood <- md2[grepl('whole_blood',md2$tissue),]
+unique(md2_whole_blood$tissue)
+f <- function(x,y) nrow(md2_whole_blood[y == x,])
+sapply(unique(md2_whole_blood$sex), f, y =  md2_whole_blood$sex); sapply(unique(md2_whole_blood$disease), f, y =  md2_whole_blood$disease)
+```
+
+
+Then, let us subset GenomicMethylSet object for whole_blood subgroup using gsm
+IDs we have in metadata.
+
+```{r}
+BE.subset <- function(gm, md_whole_blood) {
+gm_whole_blood <- gm[, gm$gsm %in% md_whole_blood$gsm] # filt h5se object. Here gsm and other meta data is in "column"
+# However, once you extract metadata by colData() -> md or md_whole_blood where its metadata now is stored in row
+md_whole_blood <- md_whole_blood[order(match(md_whole_blood$gsm, gm_whole_blood$gsm)),] # Synchronize order of md_whole_blood and gr_whole_blood by gsm sequence
+
+if (identical(gm_whole_blood$gsm, md_whole_blood$gsm)) {
+    return(gm_whole_blood)
+  } else {
+    print('GSM seuqence order doesn\'t match')
+  }
+}
+
+gm1_whole_blood <- BE.subset(gm1,md1_whole_blood)
+gm2_whole_blood <- BE.subset(gm2,md2_whole_blood)
+```
+
+Secondly, let us extract DNAm Beta-value fractions for a subset of 3 probes that
+are within BCAT1 promoter region.
+
+# Subset BCAT1 promoter cg probes for blood and whole blood subgroup in `gm1` and `gm2`
+
+```{r}
+
+BE.BCAT1 <- function(gm_whole_blood) {
+# save bval table
+bval <- getBeta(gm_whole_blood)
+bval <- t(bval) # get transpose
+cg_BCAT1 <- c('cg02765913', 'cg23036244', 'cg10764357')
+f <- function (x,y)  y[grepl(x,y)]
+cgf_BCAT1 <- sapply(cg_BCAT1, f, y = colnames(bval)) # search for which probe for BCAT1 promoter exists in this  dataset
+cgf_BCAT1 <- as.character(cgf_BCAT1) ; cgf_BCAT1 <- cgf_BCAT1[nchar(cgf_BCAT1) == 10]
+bval_BCAT1 <- bval[,colnames(bval) %in% cgf_BCAT1]  # extract a subset of 3 cg probes that are within BCAT1 promoter region
+rownames(bval_BCAT1) <- gsub("\\..*", "", rownames(bval_BCAT1)) # format rownames
+BCAT1 <- as.data.frame(bval_BCAT1);
+if (identical(gm_whole_blood$gsm, rownames(BCAT1))) {
+    BCAT1 <- bind_cols(BCAT1,as_tibble(colData(gm_whole_blood)))
+  }
+BCAT1 <- as_tibble(BCAT1)
+
+return(BCAT1)
+}
+
+gm1_BCAT1 <- BE.BCAT1(gm1_whole_blood) 
+gm2_BCAT1 <- BE.BCAT1(gm2_whole_blood)
+```
+
+Finally, let us combine both datasets for whole blood subgroup in a single tibble object
+
+# Combine two datasets in a single tibble object gm_BCAT1
+```{r}
+if (identical(colnames(gm1_BCAT1),colnames(gm2_BCAT1))) {
+  if (length(intersect(gm1_BCAT1$gsm, gm2_BCAT1$gsm)) == 0) {
+     gm_BCAT1 <- bind_rows(gm1_BCAT1,gm2_BCAT1)
+  } else {
+    print('These two datasets have overlapping GSM IDs')
+  }
+} else {
+  print('Datasets have different colnames')
+  # only combine common columns of gm1_BCAT1 and gm2_BCAT2 to make them consistent with each other
+  print('Only select common coldata')
+  com_col <- intersect(colnames(gm1_BCAT1),colnames(gm2_BCAT1))
+  gm1_BCAT1<- gm1_BCAT1[,com_col] ; gm2_BCAT1<- gm2_BCAT1[,com_col]
+}
+
+if (identical(colnames(gm1_BCAT1),colnames(gm2_BCAT1))) {
+  if (length(intersect(gm1_BCAT1$gsm, gm2_BCAT1$gsm)) == 0) {
+     gm_BCAT1 <- bind_rows(gm1_BCAT1,gm2_BCAT1)
+     gm_BCAT1 <- arrange(gm_BCAT1, 'gsm')
+  }
+}
+```
+
+To get a quantitative assessment, we can also create a summary table for gm_BCAT1
+
+```{r}
+cg_BCAT1 <- c('cg02765913', 'cg23036244', 'cg10764357')
+
+BCAT1_Sum <- function(BCAT1, cg) {
+  sex_summary <- BCAT1 %>%
+  group_by(sex) %>%
+  summarize(mean_value = mean(.data[[cg]]),
+            median_value = median(.data[[cg]]),
+            min = min(.data[[cg]]),
+            max = max(.data[[cg]])
+            )
+
+disease_summary <-
+  BCAT1 %>%
+  group_by(disease) %>%
+  summarize(mean_value = mean(.data[[cg]]),
+            median_value = median(.data[[cg]]),
+            min = min(.data[[cg]]),
+            max = max(.data[[cg]])
+  )
+sex_summary
+disease_summary
+
+# diseaseSex_summary <-
+#   BCAT1 %>%
+#   group_by(disease, sex) %>%
+#   summarize(mean_value = mean(.data[[cg]]),
+#             median_value = median(.data[[cg]]),
+#             min = min(.data[[cg]]),
+#             max = max(.data[[cg]])
+#   )
+# 
+# diseaseSex_summary
+}
+
+BCAT1_Sum(gm_BCAT1,cg_BCAT1[3])
+
+```
