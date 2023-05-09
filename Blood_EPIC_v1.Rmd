@@ -41,13 +41,14 @@ This script is to combine functionalities of `BloodMethylationPipeline_EPIC_v0_a
 # Environment setup
 ```{r setup, echo = FALSE, warning = FALSE}
 suppressMessages(library(knitr))
+suppressMessages(library(tidyverse))
 suppressMessages(library(GenomicRanges))
 suppressMessages(library(limma))
 suppressMessages(library(minfi))
 suppressMessages(library(ExperimentHub))
 suppressMessages(library(recountmethylation))
-knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = TRUE, 
-  message = TRUE)
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = TRUE,
+                      message = TRUE)
 ```
 
 # Load cached datasets on lab server
@@ -60,11 +61,16 @@ if (grepl('C:',bfccache(bfc))) q()
 filepath <- file.path(bfccache(bfc), fname)
 # For this file, getdb() and get_rmdl() neither recoginize its file name.
 # Therefore, decide to cache it manually
-if (file.exists(filepath) & !fname %in% bfcinfo(bfc)$rname) {
-      bfcadd(bfc,fname,fpath =  filepath, action="asis")
+if (file.exists(filepath)) {
+  if (!fname %in% bfcinfo(bfc)$rname) {
+    bfcadd(bfc,fname,fpath =  filepath, action="asis")
+  } else {
+    print(paste(fname,'is already cached.'))
+  }
 } else {
-  print(paste(fname,'doesn\'t exist or is already cached'))
+  print(paste(fname,'doesn\'t exist.'))
 }
+
 # Load data by H5SE method
 gm <- HDF5Array::loadHDF5SummarizedExperiment(file.path(bfccache(bfc), fname))
 return(gm)

@@ -49,11 +49,16 @@ fname <- 'remethdb_epic-hm850k_h5se_gm_1669220613_0-0-3'
 filepath <- file.path(bfccache(bfc), fname)
 # For this file, getdb() and get_rmdl() neither recoginize its file name.
 # Therefore, decide to cache it manually
-if (file.exists(filepath) & !fname %in% bfcinfo(bfc)$rname) {
-      bfcadd(bfc,fname,fpath =  filepath, action="asis")
+if (file.exists(filepath)) {
+  if (!fname %in% bfcinfo(bfc)$rname) {
+    bfcadd(bfc,fname,fpath =  filepath, action="asis")
+  } else {
+    print(paste(fname,'is already cached.'))
+  }
 } else {
-  print(paste(fname,'doesn\'t exist or is already cached'))
+  print(paste(fname,'doesn\'t exist.'))
 }
+
 # Load data by H5SE method
 gm <- HDF5Array::loadHDF5SummarizedExperiment(file.path(bfccache(bfc), fname))
 md <-  colData(gm) # get sample metadata (DO NOT CONVERT TO DATA FRAME!!!!! using as.data.frame)
