@@ -1,5 +1,5 @@
 ---
-title: "Analyze blood Methylation with recountmethylation on EPIC - v0_a" 
+title: "Analyze blood Methylation with recountmethylation on EPIC - v0_b" 
   author:- Liuhan
 date: "`r format(Sys.time(), '%d %B, %Y')`" bibliography: bibliography.bib csl:
 cell-numeric.csl package: recountmethylation output: BiocStyle::html_document:
@@ -19,24 +19,21 @@ suppressMessages(library(recountmethylation))
 knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = TRUE,
                       message = TRUE)
 ```
-This script is used for generating figures for figure 6d in my
-Methylation-SiMREPS paper draft. In panel 6d, our purpose is to generate DNA
-methylation level at BCAT1 promoter produced on either platform of Illumina Epic
-Array and Human Methylation 450. Our sample type will be whole blood from male
-healthy people with or without cancer.
-One of Vigenettes in recountmethylation R package is
-`recount_methylation_search_index.Rmd` that talks about search index
-construction from pre-compiled DNAm array data from blood samples on the
+This script is used for generating figures for figure 6d in my Methylation-SiMREPS paper draft. In panel 6d, our purpose is to generate DNA methylation level at BCAT1 promoter produced on either platform of Illumina Epic
+Array and Human Methylation 450. Our sample type will be whole blood from male healthy people with or without cancer.
+One of Vigenettes in recountmethylation R package is `recount_methylation_search_index.Rmd` that talks about search index construction from pre-compiled DNAm array data from blood samples on the
 [`recountmethylation` server](https://recount.bio/data/).
 
 The pre-compiled DNAm array data from blood is `gr-noob_h5se_hm450k-epic-merge_0-0-3` which is available for download from `recount.bio/data`. This dataset includes 13,835 samples run on either the HM450K or EPIC platform available in the Gene Expression Omnibus (GEO) by March 31, 2021, recent enough for publication. 
 
-However, in `BloodMethylationPipeline.Rmd`, we realized that `gr-noob_h5se_hm450k-epic-merge_0-0-3` only covers one probe in BCAT1 - the old probe in Human450K. Therefore, in `BloodMethylationPipeline-v1.Rmd`, we decided to use preprocessed EPIC array data: https://recount.bio/data/remethdb_h5se-gm_epic_0-0-2_1589820348/
+However, in `BloodMethylationPipeline.Rmd`, we realized that `gr-noob_h5se_hm450k-epic-merge_0-0-3` only covers one probe in BCAT1 - the old probe in Human450K. Therefore, in `BloodMethylationPipeline-v1.Rmd`, we decided to use preprocessed EPIC array data: https://recount.bio/data/remethdb_epic-hm850k_h5se_gm_1669220613_0-0-3/ and remethdb_h5se-gm_epic_0-0-2_1589820348/
+
+This script is to use `remethdb_epic-hm850k_h5se_gm_1669220613_0-0-3`.
 
 This dataset is said to include 38,122 EPIC samples with IDATs available on GEO before October 16, 2022.
 
 What we are going to do is as follows: 
-1. Download `remethdb_h5se-gm_epic_0-0-2_1589820348` under server dir (`Z:\Liuhan Dai\DNA
+1. Download `remethdb_epic-hm850k_h5se_gm_1669220613_0-0-3` under server dir (`Z:\Liuhan Dai\DNA
 Methylation Detection\20230408 figure 6d`) defined by BiocFileCache. Create a
 BiocFileCache and store this dataset in cache dir using getdb_* method. (This
 will take several hours.) 
@@ -44,11 +41,11 @@ will take several hours.)
 2. Load from cache and check its content 
 
 3. Then do analysis
-# load `remethdb_h5se-gm_epic_0-0-2_1589820348` under server dir
+# load `remethdb_epic-hm850k_h5se_gm_1669220613_0-0-3` under server dir
 ```{r}
 bfc <-BiocFileCache(cache = "Z:/Liuhan Dai/DNA Methylation Detection/20230408 figure 6d",ask = interactive())
 if (grepl('C:',bfccache(bfc))) q()
-fname <- 'remethdb_h5se-gm_epic_0-0-2_1589820348'
+fname <- 'remethdb_epic-hm850k_h5se_gm_1669220613_0-0-3'
 filepath <- file.path(bfccache(bfc), fname)
 # For this file, getdb() and get_rmdl() neither recoginize its file name.
 # Therefore, decide to cache it manually
