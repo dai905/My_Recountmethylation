@@ -1,5 +1,5 @@
 ---
-title: "Analyze blood Methylation with recountmethylation - v1" 
+title: "Analyze blood Methylation with recountmethylation on EPIC - v0_a" 
   author:- Liuhan
 date: "`r format(Sys.time(), '%d %B, %Y')`" bibliography: bibliography.bib csl:
 cell-numeric.csl package: recountmethylation output: BiocStyle::html_document:
@@ -44,21 +44,22 @@ will take several hours.)
 2. Load from cache and check its content 
 
 3. Then do analysis
-# Download `remethdb_h5se-gm_epic_0-0-2_1589820348` under server dir
+# load `remethdb_h5se-gm_epic_0-0-2_1589820348` under server dir
 ```{r}
 bfc <-BiocFileCache(cache = "Z:/Liuhan Dai/DNA Methylation Detection/20230408 figure 6d",ask = interactive())
 if (grepl('C:',bfccache(bfc))) q()
 fname <- 'remethdb_h5se-gm_epic_0-0-2_1589820348'
 filepath <- file.path(bfccache(bfc), fname)
 # For this file, getdb() and get_rmdl() neither recoginize its file name.
-# Therefore, decide to download and cache it manually
-if (!file.exists(filepath)) {
-  # Load data by H5SE method
-  gm <- HDF5Array::loadHDF5SummarizedExperiment(file.path(bfccache(bfc), fname))
-  md <-  colData(gm) # get sample metadata (DO NOT CONVERT TO DATA FRAME!!!!! using as.data.frame)
-  bfcadd(bfc,fname,fpath =  filepath, action="asis")
+# Therefore, decide to cache it manually
+if (file.exists(filepath) & !fname %in% bfcinfo(bfc)$rname) {
+      bfcadd(bfc,fname,fpath =  filepath, action="asis")
+} else {
+  print(paste(fname,'doesn\'t exist'))
 }
-
+# Load data by H5SE method
+gm <- HDF5Array::loadHDF5SummarizedExperiment(file.path(bfccache(bfc), fname))
+md <-  colData(gm) # get sample metadata (DO NOT CONVERT TO DATA FRAME!!!!! using as.data.frame)
 ```
 
 
@@ -67,46 +68,51 @@ if (!file.exists(filepath)) {
 # Let us visualize them one by one to understand the constitutions of our dataset
 f <- function(x,y) nrow(md[y == x,])
 unique(md$gse)
+length(unique(md$gsm))
 unique(md$sex); sapply(unique(md$sex), f, y =  md$sex)
 unique(md$disease); sapply(unique(md$disease), f, y =  md$disease)
 unique(md$tissue); sapply(unique(md$tissue), f, y =  md$tissue)
 # unique(md$sampletype); sapply(unique(md$sampletype), f, y =  md$sampletype) # Sample type label is not too useful.
 ```
 Now the question is which subset is of our interest. First of all, let us subset
-samples from whole_blood.
+samples from blood.
 
 ```{r}
-# extract whold_blood subset
-#md_whole_blood1 <- md[md$tissue == 'blood;whole_blood;whole' | md$tissue == 'blood;whole_blood',]
-# Alternatively, we can sues blood.subgroup component to subset whole blood samples. Decide to use blood.subgroup for subsetting
-md_whole_blood <- md[md$blood.subgroup == 'whole_blood',]
+# extract blood subset
+
+md_blood <- md[grepl('blood',md$tissue),]
+unique(md_blood$tissue)
+md_whole_blood <- md[grepl('whole_blood',md$tissue),]
+unique(md_whole_blood$tissue)
 f <- function(x,y) nrow(md_whole_blood[y == x,])
 sapply(unique(md_whole_blood$sex), f, y =  md_whole_blood$sex); sapply(unique(md_whole_blood$disease), f, y =  md_whole_blood$disease)
 ```
 Then, let us subset GenomicRatioset object for whold_blood subgroup using gsm
 IDs we have in metadata.
 ```{r}
-gr_whold_blood <- gr_noob[, gr_noob$gsm %in% md_whole_blood$gsm] # filt h5se object. Here gsm and other meta data is in "column" of gr_noob. # However, once you extract metadata by colData() -> md or md_whole_blood where its metadata now is stored in row
-md_whole_blood <- md_whole_blood[order(match(md_whole_blood$gsm, gr_whold_blood$gsm)),] # Synchronize order of md_whole_blood and gr_whold_blood by gsm sequence
-identical(gr_whold_blood$gsm, md_whole_blood$gsm)
+gm_whold_blood <- gm[, gm$gsm %in% md_whole_blood$gsm] # filt h5se object. Here gsm and other meta data is in "column"
+# However, once you extract metadata by colData() -> md or md_whole_blood where its metadata now is stored in row
+md_whole_blood <- md_whole_blood[order(match(md_whole_blood$gsm, gm_whold_blood$gsm)),] # Synchronize order of md_whole_blood and gr_whold_blood by gsm sequence
+identical(gm_whold_blood$gsm, md_whole_blood$gsm)
 ```
 Secondly, let us extract DNAm Beta-value fractions for a subset of 3 probes that
 are within BCAT1 promoter region.
 
 ```{r}
 # save bval table
-bval <- getBeta(gr_whold_blood)
+bval <- getBeta(gm_whold_blood)
 bval <- t(bval) # get transpose
 cg_BCAT1 <- c('cg02765913', 'cg23036244', 'cg10764357')
 f <- function (x,y)  y[grepl(x,y)]
 cgf_BCAT1 <- sapply(cg_BCAT1, f, y = colnames(bval)) # search for which probe for BCAT1 promoter exists in this dataset
 cgf_BCAT1 <- as.character(cgf_BCAT1) ; cgf_BCAT1 <- cgf_BCAT1[nchar(cgf_BCAT1) == 10]
 bval_BCAT1 <- bval[,colnames(bval) %in% cgf_BCAT1]  # extract a subset of 3 cg probes that are within BCAT1 promoter region
-names(bval_BCAT1) <- gsub("\\..*", "", rownames(bval)) # format rownames
-BCAT1 <- tibble( bval_BCAT1); colnames(BCAT1) <- cgf_BCAT1; row.names(BCAT1) <- names(bval_BCAT1)
-if (identical(gr_whold_blood$gsm, rownames(BCAT1))) {
-  BCAT1 <- bind_cols(BCAT1,as_tibble(colData(gr_whold_blood)))
-  }
+rownames(bval_BCAT1) <- gsub("\\..*", "", rownames(bval_BCAT1)) # format rownames
+BCAT1 <- as.data.frame(bval_BCAT1);
+if (identical(gm_whold_blood$gsm, rownames(BCAT1))) {
+  BCAT1 <- bind_cols(BCAT1,as_tibble(colData(gm_whold_blood)))
+}
+BCAT1 <- as_tibble(BCAT1)
 ```
 
 BCAT1 is a tibble object where each row is a GSM study and its column represent different phenotypes.Now, we are interested to see whether there is any difference in methylation beta values btw sexes, tissues and disease types. We do this by extract gsm for corresponding subsets.
@@ -127,7 +133,7 @@ BP + stat_boxplot(mapping = aes(x = disease, y = cg10764357)) + facet_wrap(~sex)
 BP + stat_boxplot(mapping = aes(x = tissue, y = cg10764357))
 ```
 
-To get a quantitative assessment, we can also create a summar table for BCAT1
+To get a quantitative assessment, we can also create a summary table for BCAT1
 
 ```{r}
 sex_summary <- BCAT1 %>%
@@ -157,6 +163,8 @@ diseaseSex_summary <-
             min = min(cg10764357),
             max = max(cg10764357)
   )
+
+diseaseSex_summary
 ```
 # Results and discussion
 
