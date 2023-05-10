@@ -1,5 +1,5 @@
 ---
-title: "Blood methylation pipeline using recountmethylation on EPIC array - V1"
+title: "Blood methylation pipeline using recountmethylation on EPIC array - V0_c"
 author:
 -  Liuhan Dai
 date: "`r format(Sys.time(), '%d %B, %Y')`"
@@ -24,13 +24,12 @@ vignette: >
 
 # Introdcution and overview: 
 
-This script is to combine functionalities of `BloodMethylationPipeline_EPIC_v0_a` and `v0_b`. What it does is as follows:
+This script is to load, analyze and visualize `remethdb_epic-hm850k_h5_gm_0-0-3_1669220613.h5`. What it does is as follows:
 
-1. load two compiled datasets stored on lab server.
-  a. Both datasets are measured on illumina infinium methylation EPIC array
-  b. Their url on online server is 
-  1) https://recount.bio/data/remethdb_h5se-gm_epic_0-0-2_1589820348/
-  2) https://recount.bio/data/remethdb_epic-hm850k_h5se_gm_1669220613_0-0-3/
+1. load one compiled dataset stored on lab server.
+  a. measured on illumina infinium methylation EPIC array
+  b. Its url on online server is 
+  https://recount.bio/data/remethdb_epic-hm850k_h5_gm_0-0-3_1669220613.h5
 
 2. Subset blood and whole blood samples for each of them
 
@@ -76,36 +75,22 @@ gm <- HDF5Array::loadHDF5SummarizedExperiment(file.path(bfccache(bfc), fname))
 return(gm)
 }
 
-# load `remethdb_h5se-gm_epic_0-0-2_1589820348` as gm1 and `remethdb_epic-hm850k_h5se_gm_1669220613_0-0-3` as gm2
-gm1 <- BE.load('remethdb_h5se-gm_epic_0-0-2_1589820348')
-gm2 <- BE.load('remethdb_epic-hm850k_h5se_gm_1669220613_0-0-3')
-
-md1 <-  colData(gm1) # get sample metadata (DO NOT CONVERT TO DATA FRAME!!!!! using as.data.frame)
-md2 <-  colData(gm2) # get sample metadata (DO NOT CONVERT TO DATA FRAME!!!!! using as.data.frame)
+# load 'remethdb_epic-hm850k_h5_gm_0-0-3_1669220613.h5' as gm
+gm <- BE.load('remethdb_epic-hm850k_h5_gm_0-0-3_1669220613.h5')
+md <-  colData(gm) # get sample metadata (DO NOT CONVERT TO DATA FRAME!!!!! using as.data.frame)
 ```
 
-# Subset blood and whole blood samples for `gm1` and `gm2`
+# Subset blood and whole blood samples for `gm`
 
 ```{r}
-# extract GSM ID subset for blood and whole blood in `gm1`
+# extract GSM ID subset for blood and whole blood in `gm`
 
-md1_blood <- md1[grepl('blood',md1$tissue),]
-unique(md1_blood$tissue)
-md1_whole_blood <- md1[grepl('whole_blood',md1$tissue),]
-unique(md1_whole_blood$tissue)
-f <- function(x,y) nrow(md1_whole_blood[y == x,])
-sapply(unique(md1_whole_blood$sex), f, y =  md1_whole_blood$sex); sapply(unique(md1_whole_blood$disease), f, y =  md1_whole_blood$disease)
-```
-
-```{r}
-# extract GSM ID subset for blood and whole blood in `gm2`
-
-md2_blood <- md2[grepl('blood',md2$tissue),]
-unique(md2_blood$tissue)
-md2_whole_blood <- md2[grepl('whole_blood',md2$tissue),]
-unique(md2_whole_blood$tissue)
-f <- function(x,y) nrow(md2_whole_blood[y == x,])
-sapply(unique(md2_whole_blood$sex), f, y =  md2_whole_blood$sex); sapply(unique(md2_whole_blood$disease), f, y =  md2_whole_blood$disease)
+md_blood <- md[grepl('blood',md$tissue),]
+unique(md_blood$tissue)
+md_whole_blood <- md[grepl('whole_blood',md$tissue),]
+unique(md_whole_blood$tissue)
+f <- function(x,y) nrow(md_whole_blood[y == x,])
+sapply(unique(md_whole_blood$sex), f, y =  md_whole_blood$sex); sapply(unique(md_whole_blood$disease), f, y =  md_whole_blood$disease)
 ```
 
 
@@ -125,14 +110,13 @@ if (identical(gm_whole_blood$gsm, md_whole_blood$gsm)) {
   }
 }
 
-gm1_whole_blood <- BE.subset(gm1,md1_whole_blood)
-gm2_whole_blood <- BE.subset(gm2,md2_whole_blood)
+gm_whole_blood <- BE.subset(gm,md_whole_blood)
 ```
 
 Secondly, let us extract DNAm Beta-value fractions for a subset of 3 probes that
 are within BCAT1 promoter region.
 
-# Subset BCAT1 promoter cg probes for blood and whole blood subgroup in `gm1` and `gm2`
+# Subset BCAT1 promoter cg probes for blood and whole blood subgroup in `gm`
 
 ```{r}
 
@@ -155,34 +139,7 @@ BCAT1 <- as_tibble(BCAT1)
 return(BCAT1)
 }
 
-gm1_BCAT1 <- BE.BCAT1(gm1_whole_blood) 
-gm2_BCAT1 <- BE.BCAT1(gm2_whole_blood)
-```
-
-Finally, let us combine both datasets for whole blood subgroup in a single tibble object
-
-# Combine two datasets in a single tibble object gm_BCAT1
-```{r}
-if (identical(colnames(gm1_BCAT1),colnames(gm2_BCAT1))) {
-  if (length(intersect(gm1_BCAT1$gsm, gm2_BCAT1$gsm)) == 0) {
-     gm_BCAT1 <- bind_rows(gm1_BCAT1,gm2_BCAT1)
-  } else {
-    print('These two datasets have overlapping GSM IDs')
-  }
-} else {
-  print('Datasets have different colnames')
-  # only combine common columns of gm1_BCAT1 and gm2_BCAT2 to make them consistent with each other
-  print('Only select common coldata')
-  com_col <- intersect(colnames(gm1_BCAT1),colnames(gm2_BCAT1))
-  gm1_BCAT1<- gm1_BCAT1[,com_col] ; gm2_BCAT1<- gm2_BCAT1[,com_col]
-}
-
-if (identical(colnames(gm1_BCAT1),colnames(gm2_BCAT1))) {
-  if (length(intersect(gm1_BCAT1$gsm, gm2_BCAT1$gsm)) == 0) {
-     gm_BCAT1 <- bind_rows(gm1_BCAT1,gm2_BCAT1)
-     gm_BCAT1 <- arrange(gm_BCAT1, 'gsm')
-  }
-}
+gm_BCAT1 <- BE.BCAT1(gm_whole_blood) 
 ```
 
 To get a quantitative assessment, we can also create a summary table for gm_BCAT1
