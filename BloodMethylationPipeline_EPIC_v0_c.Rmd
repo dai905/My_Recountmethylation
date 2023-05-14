@@ -186,4 +186,5 @@ BCAT1_Sum(gm_BCAT1,cg_BCAT1[3])
 Now, the question is how to come up with a reasonable explanation for my 30% BCAT1 in human blood. Here is what I am going to do. 
 
 First, figure out probe binding sequence using snapgene alignment
-Second, 
+Second, come up with mathematical relationship of methylation signals among three probes.
+Thirdly, see whether they can be consistent with my measurement in any ways.
