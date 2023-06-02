@@ -42,6 +42,7 @@ This script is to combine functionalities of `BloodMethylationPipeline_EPIC_v0_a
 ```{r setup, echo = FALSE, warning = FALSE}
 suppressMessages(library(knitr))
 suppressMessages(library(tidyverse))
+suppressMessages(library(plotly))
 suppressMessages(library(GenomicRanges))
 suppressMessages(library(limma))
 suppressMessages(library(minfi))
@@ -91,7 +92,7 @@ md2 <-  colData(gm2) # get sample metadata (DO NOT CONVERT TO DATA FRAME!!!!! us
 
 md1_blood <- md1[grepl('blood',md1$tissue),]
 unique(md1_blood$tissue)
-md1_whole_blood <- md1[grepl('whole_blood',md1$tissue),]
+md1_whole_blood <- md1[grepl('whole_blood', md1$tissue, ignore.case = TRUE) | grepl('peripheral', md1$tissue, ignore.case = TRUE),]
 unique(md1_whole_blood$tissue)
 f <- function(x,y) nrow(md1_whole_blood[y == x,])
 sapply(unique(md1_whole_blood$sex), f, y =  md1_whole_blood$sex); sapply(unique(md1_whole_blood$disease), f, y =  md1_whole_blood$disease)
@@ -102,15 +103,32 @@ sapply(unique(md1_whole_blood$sex), f, y =  md1_whole_blood$sex); sapply(unique(
 
 md2_blood <- md2[grepl('blood',md2$tissue),]
 unique(md2_blood$tissue)
-md2_whole_blood <- md2[grepl('whole_blood',md2$tissue),]
+md2_whole_blood <- md2[grepl('whole_blood', md2$tissue, ignore.case = TRUE) | grepl('peripheral', md2$tissue, ignore.case = TRUE),]
 unique(md2_whole_blood$tissue)
 f <- function(x,y) nrow(md2_whole_blood[y == x,])
 sapply(unique(md2_whole_blood$sex), f, y =  md2_whole_blood$sex); sapply(unique(md2_whole_blood$disease), f, y =  md2_whole_blood$disease)
 ```
 
 
-Then, let us subset GenomicMethylSet object for whole_blood subgroup using gsm
+Then, let us subset GenomicMethylSet object for blood and whole_blood subgroup using gsm
 IDs we have in metadata.
+```{r}
+BE.blood_subset <- function(gm, md_blood) {
+gm_blood <- gm[, gm$gsm %in% md_blood$gsm] # filt h5se object. Here gsm and other meta data is in "column"
+# However, once you extract metadata by colData() -> md or md_blood where its metadata now is stored in row
+md_blood <- md_blood[order(match(md_blood$gsm, gm_blood$gsm)),] # Synchronize order of md_blood and gm_blood by gsm sequence
+
+if (identical(gm_blood$gsm, md_blood$gsm)) {
+    return(gm_blood)
+  } else {
+    print('GSM seuqence order doesn\'t match')
+  }
+}
+
+gm1_blood <- BE.blood_subset(gm1,md1_blood)
+gm2_blood <- BE.blood_subset(gm2,md2_blood)
+```
+
 
 ```{r}
 BE.subset <- function(gm, md_whole_blood) {
@@ -136,9 +154,9 @@ are within BCAT1 promoter region.
 
 ```{r}
 
-BE.BCAT1 <- function(gm_whole_blood) {
+BE.BCAT1 <- function(gm) {
 # save bval table
-bval <- getBeta(gm_whole_blood)
+bval <- getBeta(gm)
 bval <- t(bval) # get transpose
 cg_BCAT1 <- c('cg02765913', 'cg23036244', 'cg10764357')
 f <- function (x,y)  y[grepl(x,y)]
@@ -147,19 +165,24 @@ cgf_BCAT1 <- as.character(cgf_BCAT1) ; cgf_BCAT1 <- cgf_BCAT1[nchar(cgf_BCAT1) =
 bval_BCAT1 <- bval[,colnames(bval) %in% cgf_BCAT1]  # extract a subset of 3 cg probes that are within BCAT1 promoter region
 rownames(bval_BCAT1) <- gsub("\\..*", "", rownames(bval_BCAT1)) # format rownames
 BCAT1 <- as.data.frame(bval_BCAT1);
-if (identical(gm_whole_blood$gsm, rownames(BCAT1))) {
-    BCAT1 <- bind_cols(BCAT1,as_tibble(colData(gm_whole_blood)))
+if (identical(gm$gsm, rownames(BCAT1))) {
+    BCAT1 <- bind_cols(BCAT1,as_tibble(colData(gm)))
   }
 BCAT1 <- as_tibble(BCAT1)
 
 return(BCAT1)
 }
 
-gm1_BCAT1 <- BE.BCAT1(gm1_whole_blood) 
-gm2_BCAT1 <- BE.BCAT1(gm2_whole_blood)
+# Subset BCAT1 promoter cg probes for whole_blood subgroup in `gm1` and `gm2`
+#gm1_BCAT1 <- BE.BCAT1(gm1_whole_blood) 
+#gm2_BCAT1 <- BE.BCAT1(gm2_whole_blood)
+
+# Subset BCAT1 promoter cg probes for blood subgroup in `gm1` and `gm2`
+gm1_BCAT1 <- BE.BCAT1(gm1_blood) 
+gm2_BCAT1 <- BE.BCAT1(gm2_blood)
 ```
 
-Finally, let us combine both datasets for whole blood subgroup in a single tibble object
+Finally, let us combine both datasets for Blood/whole blood subgroup in a single tibble object
 
 # Combine two datasets in a single tibble object gm_BCAT1
 ```{r}
@@ -183,6 +206,10 @@ if (identical(colnames(gm1_BCAT1),colnames(gm2_BCAT1))) {
      gm_BCAT1 <- arrange(gm_BCAT1, 'gsm')
   }
 }
+
+# save gm_BCAT1
+#write.csv(gm_BCAT1, "BCAT1_Whole_Blood.csv", row.names = FALSE)
+write.csv(gm_BCAT1, "BCAT1_Blood.csv", row.names = FALSE)
 ```
 
 To get a quantitative assessment, we can also create a summary table for gm_BCAT1
@@ -226,7 +253,50 @@ BCAT1_Sum(gm_BCAT1,cg_BCAT1[3])
 
 ```
 
-Now, the question is how to come up with a reasonable explanation for my 30% BCAT1 in human blood. Here is what I am going to do. 
 
-First, figure out probe binding sequence using snapgene alignment
-Second, 
+Now, the question is how to come up with a reasonable explanation for my 30% BCAT1 in human blood. Here is what I am going to do. Let us first visualize our dataset to get a feeling in different aspects.
+
+# Data Visualization
+```{r}
+# Data Visualization
+
+BCAT1_blood <- ggplot(data = gm_BCAT1)
+plot <- BCAT1_blood + geom_point(mapping = aes(x = cg23036244, y = cg10764357))
+
+# Adjust the scale of the x-axis
+plot <- plot + scale_x_continuous(
+  limits = c(0, 1),  # Set the limits of the x-axis
+  breaks = seq(0, 1, by = 0.2),  # Set the tick marks of the x-axis
+  labels = c("0", "0.2", "0.4", "0.6", "0.8", "1")  # Set custom labels for the x-axis
+)
+
+# Adjust the scale of the y-axis
+plot <- plot + scale_y_continuous(
+  limits = c(0, 1),  # Set the limits of the x-axis
+  breaks = seq(0, 1, by = 0.2),  # Set the tick marks of the x-axis
+  labels = c("0", "0.2", "0.4", "0.6", "0.8", "1")  # Set custom labels for the x-axis
+)
+plot <- plot + coord_equal()
+
+print(plot)
+
+# Summary of each cg probe;  cg_BCAT1 <- c('cg02765913', 'cg23036244', 'cg10764357')
+summary(gm_BCAT1$cg02765913)
+summary(gm_BCAT1$cg23036244)
+summary(gm_BCAT1$cg10764357)
+
+# Create a 3D scatter plot using plot_ly
+plot <- plot_ly(data = gm_BCAT1, 
+                x = ~cg02765913, y = ~cg23036244, z = ~cg10764357, 
+                type = "scatter3d", mode = "markers",
+                marker = list(size = 2))
+
+# Customize the appearance of the plot
+plot <- plot %>% layout(scene = list(xaxis = list(title = "cg02765913"),
+                                     yaxis = list(title = "cg23036244"),
+                                     zaxis = list(title = "cg10764357")))
+
+# Display the 3D scatter plot
+plot
+
+```
